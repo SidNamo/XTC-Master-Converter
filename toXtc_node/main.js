@@ -263,34 +263,38 @@ ipcMain.on('start-conversion', async (event, settings) => {
         fs.writeFileSync(cp, JSON.stringify(cfg));
         const tx = ep.replace('.epub', '.xtc');
         
+        // 🔥 핵심 변경: Commander.js의 Electron 감지 버그를 속이는 임시 래퍼 스크립트 생성
+        const wrapperPath = path.join(tempBaseDir, `wrap_${Date.now()}.js`);
+        fs.writeFileSync(wrapperPath, `
+            // Electron 환경 변수를 지워서 commander가 일반 Node로 착각하게 만듭니다.
+            delete process.versions.electron;
+            require(${JSON.stringify(cliEntry)});
+        `);
+
         try {
             await new Promise((resolve, reject) => {
-                const { fork } = require('child_process');
+                const { spawn } = require('child_process');
                 
-                // process.execPath는 fork 내부에서 자동으로 처리됩니다.
-                const child = fork(cliEntry, ['convert', ep, tx, '-c', cp], { 
+                // cliEntry 대신 wrapperPath를 먼저 실행합니다.
+                const child = spawn(process.execPath, [wrapperPath, 'convert', ep, tx, '-c', cp], { 
                     cwd: ed, 
-                    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-                    stdio: ['pipe', 'pipe', 'pipe', 'ipc'] // 실시간 로그 수신을 위한 파이프 설정
+                    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } 
                 });
                 
                 let stdoutLog = "", stderrLog = "";
 
-                // 실시간 일반 로그 수신
                 child.stdout.on('data', (data) => {
                     const str = data.toString();
                     stdoutLog += str;
                     mainWindow.webContents.send('engine-stream', { file: originalName, text: str });
                 });
 
-                // 실시간 에러 로그 수신
                 child.stderr.on('data', (data) => {
                     const str = data.toString();
                     stderrLog += str;
                     mainWindow.webContents.send('engine-stream', { file: originalName, text: str }); 
                 });
 
-                // 작업 종료 시
                 child.on('close', (code) => {
                     if (code === 0 && fs.existsSync(tx)) resolve(true);
                     else reject(new Error(stderrLog || stdoutLog || "엔진 변환 실패"));
@@ -309,10 +313,13 @@ ipcMain.on('start-conversion', async (event, settings) => {
             }
             return false;
         } catch (e) {
-            // 에러 시 로그 파일에도 기록
             writeDetailedLog("ENGINE-ERROR", originalName, e.message);
             throw e;
-        } finally { if(fs.existsSync(cp)) fs.unlinkSync(cp); }
+        } finally { 
+            if(fs.existsSync(cp)) fs.unlinkSync(cp); 
+            // 다 쓴 래퍼 스크립트 청소
+            if(fs.existsSync(wrapperPath)) fs.unlinkSync(wrapperPath); 
+        }
     };
 
     const processItem = async (fp, td) => {
