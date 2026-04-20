@@ -12,7 +12,7 @@
     "start": "electron .",
     "build-win": "electron-builder --win --x64 --ia32 --publish never",
     "build-mac": "electron-builder --mac --x64 --arm64 --universal --publish never",
-    "postinstall": "cd epub-to-xtc-converter && npm install"
+    "postinstall": "npm install --prefix epub-to-xtc-converter"
   },
   "build": {
     "appId": "com.namo.toxtc",
