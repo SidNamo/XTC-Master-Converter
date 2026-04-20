@@ -6,7 +6,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win --x64"
+    "build": "electron-builder --win x64 ia32 --mac x64 arm64 universal",
+    "build-win": "electron-builder --win x64 ia32",
+    "build-mac": "electron-builder --mac x64 arm64 universal"
   },
   "build": {
     "appId": "com.namo.toxtc",
@@ -16,7 +18,21 @@
     },
     "win": {
       "target": "portable",
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}",
       "requestedExecutionLevel": "asInvoker"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "files": [
       "**/*",
@@ -30,7 +46,9 @@
       {
         "from": "epub-to-xtc-converter",
         "to": "epub-to-xtc-converter",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "asar": true
