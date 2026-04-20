@@ -1,18 +1,17 @@
 {
   "name": "toxtc_node",
   "version": "1.0.0",
+  "description": "XTC Master Converter",
+  "author": "Namo",
   "repository": {
     "type": "git",
     "url": "https://github.com/SidNamo/XTC-Master-Converter.git"
   },
-  "description": "XTC Master Converter",
-  "author": "Namo",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win x64 ia32 --mac x64 arm64 universal",
-    "build-win": "electron-builder --win --x64 --ia32",
-    "build-mac": "electron-builder --mac --x64 --arm64 --universal"
+    "build-win": "electron-builder --win --x64 --ia32 --publish never",
+    "build-mac": "electron-builder --mac --x64 --arm64 --universal --publish never"
   },
   "build": {
     "appId": "com.namo.toxtc",
@@ -26,10 +25,7 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg", "zip"],
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
       "category": "public.app-category.utilities",
       "hardenedRuntime": true,
@@ -50,9 +46,7 @@
       {
         "from": "epub-to-xtc-converter",
         "to": "epub-to-xtc-converter",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ],
     "asar": true
