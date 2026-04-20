@@ -7,8 +7,8 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win x64 ia32 --mac x64 arm64 universal",
-    "build-win": "electron-builder --win x64 ia32",
-    "build-mac": "electron-builder --mac x64 arm64 universal"
+    "build-win": "electron-builder --win --x64 --ia32",
+    "build-mac": "electron-builder --mac --x64 --arm64 --universal"
   },
   "build": {
     "appId": "com.namo.toxtc",
