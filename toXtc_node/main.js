@@ -264,10 +264,15 @@ ipcMain.on('start-conversion', async (event, settings) => {
         const tx = ep.replace('.epub', '.xtc');
         
         try {
-            // 🔥 핵심 변경: exec 대신 spawn을 사용하여 실시간 로그 스트리밍
             await new Promise((resolve, reject) => {
-                const { spawn } = require('child_process');
-                const child = spawn(process.execPath, [cliEntry, 'convert', ep, tx, '-c', cp], { cwd: ed, env: {...process.env, ELECTRON_RUN_AS_NODE: '1'} });
+                const { fork } = require('child_process');
+                
+                // process.execPath는 fork 내부에서 자동으로 처리됩니다.
+                const child = fork(cliEntry, ['convert', ep, tx, '-c', cp], { 
+                    cwd: ed, 
+                    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+                    stdio: ['pipe', 'pipe', 'pipe', 'ipc'] // 실시간 로그 수신을 위한 파이프 설정
+                });
                 
                 let stdoutLog = "", stderrLog = "";
 
@@ -275,7 +280,6 @@ ipcMain.on('start-conversion', async (event, settings) => {
                 child.stdout.on('data', (data) => {
                     const str = data.toString();
                     stdoutLog += str;
-                    // 🔥 변경: 파일명(originalName)과 텍스트를 같이 보냄
                     mainWindow.webContents.send('engine-stream', { file: originalName, text: str });
                 });
 
@@ -283,7 +287,6 @@ ipcMain.on('start-conversion', async (event, settings) => {
                 child.stderr.on('data', (data) => {
                     const str = data.toString();
                     stderrLog += str;
-                    // 🔥 변경: 파일명(originalName)과 텍스트를 같이 보냄
                     mainWindow.webContents.send('engine-stream', { file: originalName, text: str }); 
                 });
 
