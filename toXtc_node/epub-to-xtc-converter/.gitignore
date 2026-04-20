@@ -1,0 +1,21 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude
+.claude/
+CLAUDE.md
+
+# Test files
+*.epub
+*.xtc
+*.xtch
+
+# Node modules (if any)
+node_modules/

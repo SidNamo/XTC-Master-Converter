@@ -1,0 +1,48 @@
+{
+  "name": "toxtc_node",
+  "version": "1.0.0",
+  "description": "XTC Master Converter",
+  "author": "Namo",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.namo.toxtc",
+    "productName": "XTC_Master_Converter",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "files": [
+      "**/*",
+      "!dist/*",
+      "!logs/*",
+      "!temp/*",
+      "!config.json",
+      "!epub-to-xtc-converter/*"
+    ],
+    "extraResources": [
+      {
+        "from": "epub-to-xtc-converter",
+        "to": "epub-to-xtc-converter",
+        "filter": ["**/*"]
+      }
+    ],
+    "asar": true
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.17",
+    "iconv-lite": "^0.7.2",
+    "jschardet": "^3.1.4",
+    "pdf-to-png-converter": "^3.18.0"
+  },
+  "devDependencies": {
+    "electron": "^41.2.1",
+    "electron-builder": "^24.13.3"
+  }
+}

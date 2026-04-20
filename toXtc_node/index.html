@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>XTC 마스터 변환기 (Ultimate Edition)</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f0f0f0;
+            margin: 15px;
+            font-size: 12px;
+        }
+
+        fieldset {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #fff;
+        }
+
+        legend {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .row label {
+            width: 110px;
+        }
+
+        .row input[type="text"],
+        .row select {
+            flex: 1;
+            padding: 4px;
+            border: 1px solid #ccc;
+        }
+
+        .row button {
+            margin-left: 5px;
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .slider-row label {
+            width: 110px;
+        }
+
+        .slider-row input[type="range"] {
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .slider-row input[type="number"] {
+            width: 50px;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            table-layout: fixed;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #e9e9e9;
+            cursor: pointer;
+            position: sticky;
+            top: 0;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-start {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px;
+            flex: 1;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-stop {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 15px;
+            flex: 1;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #logs-container {
+            height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <fieldset>
+        <legend>경로 및 엔진 설정</legend>
+        <div class="row"><label>원본 폴더:</label><input type="text" id="sourceDir" readonly><button id="btnSource">찾기</button>
+        </div>
+        <div class="row"><label>저장 폴더:</label><input type="text" id="targetDir" readonly><button id="btnTarget">찾기</button>
+        </div>
+        <div class="row">
+            <label>저장 파일명:</label>
+            <input type="text" id="fileNameFormat" value="{name}.{ext}.xtc" placeholder="{name}.{ext}.xtc"
+                oninput="this.value = this.value.replace(/[<>:&quot;/\\|?*]/g, '')">
+        </div>
+        <div style="font-size: 11px; color: #666; margin-left: 115px; margin-top: -3px; line-height: 1.4;">
+            * 태그: {name}(이름), {ext}(확장자)<br>
+            * 날짜: {yyyy}(년), {mm}(월), {dd}(일), {hh}(시), {mi}(분), {ss}(초)
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>TEXT SETTINGS</legend>
+        <div class="row"><label>폰트 파일:</label><input type="text" id="fontPath" readonly><button id="btnFont">찾기</button>
+        </div>
+        <div class="slider-row"><label>Font Size</label><input type="range" id="fsR" min="10" max="50" value="22"><input
+                type="number" id="fsN" value="22"></div>
+        <div class="slider-row"><label>Margins</label><input type="range" id="mgR" min="0" max="100" value="20"><input
+                type="number" id="mgN" value="20"></div>
+        <div class="row"><label>W:</label><input type="number" id="resW" value="480" style="width:60px;"><label
+                style="width:auto; margin:0 10px;">H:</label><input type="number" id="resH" value="800"
+                style="width:60px;"></div>
+    </fieldset>
+
+    <div class="btn-group">
+        <button id="btnStart" class="btn-start">변환 시작</button>
+        <button id="btnStop" class="btn-stop" disabled>중지</button>
+    </div>
+
+    <fieldset style="margin-top: 10px; background: #e3f2fd; border-color: #2196f3;">
+        <legend>진행 상태</legend>
+    
+        <div style="margin-bottom: 15px;">
+            <div
+                style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; font-weight: bold; color: #e65100;">
+                <span id="fileProgText">현재 파일: 대기 중...</span>
+                <span id="fileProgPercent">0%</span>
+            </div>
+            <div style="width: 100%; background: #ffe0b2; height: 14px; border-radius: 7px; overflow: hidden;">
+                <div id="fileProgBar" style="width: 0%; background: #ff9800; height: 100%; transition: width 0.1s;"></div>
+            </div>
+        </div>
+    
+        <div>
+            <div
+                style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; font-weight: bold; color: #1565c0;">
+                <span id="progText">전체 파일 진행: 대기 중...</span>
+                <span id="progPercent">0%</span>
+            </div>
+            <div style="width: 100%; background: #ccc; height: 20px; border-radius: 10px; overflow: hidden;">
+                <div id="progBar" style="width: 0%; background: #2196f3; height: 100%; transition: width 0.2s;"></div>
+            </div>
+            <div style="margin-top: 5px; font-size: 11px; color: #555;">
+                전체: <span id="totalCount">0</span> |
+                완료: <span id="doneCount">0</span> |
+                대기: <span id="waitCount">0</span>
+            </div>
+        </div>
+    </fieldset>
+    
+    <fieldset style="margin-top: 10px;">
+
+    <fieldset style="margin-top: 10px;">
+        <legend>변환 이력</legend>
+        <div id="logs-container">
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">No.</th>
+                        <th style="width: 25%;">원본 파일명</th>
+                        <th style="width: 10%;">원본 확장자</th>
+                        <th style="width: 10%; display:none;">변환 확장자</th>
+                        <th style="width: 12%;">원본 크기</th>
+                        <th style="width: 12%;">변환 크기</th>
+                        <th style="width: 8%;">상태</th>
+                        <th>메세지</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody"></tbody>
+            </table>
+        </div>
+    </fieldset>
+    <script src="renderer.js"></script>
+</body>
+
+</html>

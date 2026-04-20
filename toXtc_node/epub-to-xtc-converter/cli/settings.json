@@ -1,0 +1,40 @@
+{
+  "device": "xteink-x4",
+  "width": 480,
+  "height": 800,
+  "font": {
+    "path": "/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf",
+    "size": 34,
+    "weight": 400
+  },
+  "margins": {
+    "left": 16,
+    "top": 16,
+    "right": 16,
+    "bottom": 16
+  },
+  "lineHeight": 120,
+  "textAlign": "justify",
+  "hyphenation": {
+    "enabled": true,
+    "language": "en"
+  },
+  "output": {
+    "format": "xtc",
+    "dithering": true,
+    "ditherStrength": 0.7,
+    "negative": false
+  },
+  "optimizer": {
+    "removeCss": true,
+    "stripFonts": true,
+    "processImages": true,
+    "removeUnsupportedImages": true,
+    "grayscale": true,
+    "maxImageWidth": 480,
+    "injectCss": true,
+    "recursive": true,
+    "include": "*.epub",
+    "exclude": null
+  }
+}
