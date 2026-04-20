@@ -11,7 +11,7 @@
   "scripts": {
     "start": "electron .",
     "build-win": "electron-builder --win --x64 --ia32 --publish never",
-    "build-mac": "electron-builder --mac --x64 --arm64 --universal --publish never"
+    "build-mac": "electron-builder --mac --x64 --arm64 --publish never"
   },
   "build": {
     "appId": "com.namo.toxtc",
