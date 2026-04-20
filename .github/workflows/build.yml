@@ -26,7 +26,9 @@ jobs:
           cache-dependency-path: './toXtc_node/package-lock.json'
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          npm install
+          cd epub-to-xtc-converter && npm install # 엔진 폴더 안의 라이브러리도 설치합니다!
 
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
