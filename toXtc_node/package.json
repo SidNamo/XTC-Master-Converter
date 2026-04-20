@@ -47,7 +47,10 @@
       {
         "from": "epub-to-xtc-converter",
         "to": "epub-to-xtc-converter",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*",
+          "node_modules/**/*" 
+        ]
       }
     ],
     "asar": true
