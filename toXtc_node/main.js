@@ -14,7 +14,7 @@ app.disableHardwareAcceleration();
 let mainWindow;
 
 /**
- * [수정] 빌드된 포터블 EXE와 같은 위치를 찾기 위한 경로 로직
+ * 빌드된 포터블 EXE와 같은 위치를 찾기 위한 경로 로직
  */
 const isPackaged = app.isPackaged;
 let basePath;
@@ -70,7 +70,7 @@ function writeDetailedLog(status, name, msg, stdout = "", stderr = "") {
 }
 
 /**
- * [수정] 파일명 포맷 치환 함수 (날짜 태그 및 점 제외 확장자 적용)
+ * 파일명 포맷 치환 함수 (날짜 태그 및 점 제외 확장자 적용)
  */
 function getFormattedFileName(format, name, ext, fileNameFormat) {
     const now = new Date();
@@ -100,7 +100,7 @@ function getFormattedFileName(format, name, ext, fileNameFormat) {
 }
 
 /**
- * [수정] 전체 작업 개수 미리 계산 - ZIP 내부의 ZIP까지 재귀적으로 탐색
+ * 전체 작업 개수 미리 계산 - ZIP 내부의 ZIP까지 재귀적으로 탐색
  */
 async function countTasks(srcPath) {
     let count = 0;
@@ -153,7 +153,7 @@ async function countTasksInZip(zipBuffer) {
 }
 
 /**
- * [추가] 중복 파일명 방지 함수 (윈도우 스타일 넘버링)
+ * 중복 파일명 방지 함수 (윈도우 스타일 넘버링)
  * - (1) (1) 이중 생성 방지 및 빈 번호 채우기
  */
 function getUniqueFilePath(dir, name, ext) {
@@ -161,7 +161,6 @@ function getUniqueFilePath(dir, name, ext) {
     if (!fs.existsSync(finalPath)) return finalPath;
 
     // 이미 "이름 (숫자)" 형태인지 확인하는 정규식
-    // 예: "제목1 (1)" -> match[1]="제목1", match[2]="1"
     const match = name.match(/^(.*?)(?:\s*\((\d+)\))?$/);
     const base = match[1] || name;
     let counter = match[2] ? parseInt(match[2], 10) : 1;
@@ -177,7 +176,7 @@ function getUniqueFilePath(dir, name, ext) {
 }
 
 /**
- * EPUB 생성 함수
+ * EPUB 생성 함수 (TOC/NCX 목차 생성 로직 추가)
  */
 function createEpub(files, epubPath, title, type = 'text', settings = {}) {
     const zip = new AdmZip();
@@ -196,11 +195,16 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
     `;
     zip.addFile("OEBPS/style.css", Buffer.from(css, "utf8"));
 
-    let manifest = "", spine = "";
+    let manifest = "", spine = "", navPoints = "";
+
     files.forEach((f, i) => {
         const ext = path.extname(f.name || '.png').toLowerCase();
-        const ih = `i${i}${ext}`, hh = `p${i}.html`;
+        const ih = `i${i}${ext}`;
+        const hh = `p${i}.html`;
         
+        // 파일 제목이 있으면 쓰고 없으면 전체 제목(파일명)을 챕터명으로 사용
+        const chapTitle = f.title || title;
+
         if (type === 'image') {
             zip.addFile(`OEBPS/${ih}`, f.data);
             const imgHtml = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html><head><meta charset="utf-8"/><link rel="stylesheet" type="text/css" href="style.css"/></head><body style="text-align:center;"><img src="${ih}" style="width:100%;"/></body></html>`;
@@ -208,14 +212,23 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
             manifest += `<item id="img${i}" href="${ih}" media-type="image/${ext==='.png'?'png':'jpeg'}"/><item id="p${i}" href="${hh}" media-type="application/xhtml+xml"/>`;
             spine += `<itemref idref="p${i}"/>`;
         } else {
-            const txtHtml = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>${f.content}</body></html>`;
+            const txtHtml = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html><head><meta charset="utf-8"/><title>${chapTitle}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>${f.content}</body></html>`;
             zip.addFile(`OEBPS/${hh}`, Buffer.from(txtHtml, "utf8"));
             manifest += `<item id="p${i}" href="${hh}" media-type="application/xhtml+xml"/>`;
             spine += `<itemref idref="p${i}"/>`;
         }
+        
+        // 목차 네비게이션 포인트 추가
+        navPoints += `<navPoint id="nav${i}" playOrder="${i+1}"><navLabel><text>${chapTitle}</text></navLabel><content src="${hh}"/></navPoint>`;
     });
-    manifest += `<item id="css" href="style.css" media-type="text/css"/>`;
-    zip.addFile("OEBPS/content.opf", Buffer.from(`<?xml version="1.0" encoding="utf-8"?><package version="2.0" xmlns="http://www.idpf.org/2007/opf"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${title}</dc:title></metadata><manifest>${manifest}</manifest><spine>${spine}</spine></package>`, "utf8"));
+
+    manifest += `<item id="css" href="style.css" media-type="text/css"/><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`;
+    
+    const opf = `<?xml version="1.0" encoding="utf-8"?><package version="2.0" xmlns="http://www.idpf.org/2007/opf"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${title}</dc:title><dc:language>ko</dc:language></metadata><manifest>${manifest}</manifest><spine toc="ncx">${spine}</spine></package>`;
+    const ncx = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd"><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="uid"/></head><docTitle><text>${title}</text></docTitle><navMap>${navPoints}</navMap></ncx>`;
+    
+    zip.addFile("OEBPS/content.opf", Buffer.from(opf, "utf8"));
+    zip.addFile("OEBPS/toc.ncx", Buffer.from(ncx, "utf8"));
     zip.writeZip(epubPath);
 }
 
@@ -253,7 +266,7 @@ ipcMain.on('start-conversion', async (event, settings) => {
 
         const m = parseInt(settings.margins || 20);
         const cfg = { 
-            "device":"custom", "width":parseInt(settings.w), "height":parseInt(settings.h), 
+            "device":"custom", "width":parseInt(settings.w || 480), "height":parseInt(settings.h || 800), 
             "font":{"path":settings.font, "size":parseInt(settings.fontSize), "weight":400}, 
             "margins":{"left":m,"top":m,"right":m,"bottom":m}, 
             "lineHeight":parseInt(settings.lineHeight || 140), "textAlign":"left", 
@@ -328,7 +341,7 @@ ipcMain.on('start-conversion', async (event, settings) => {
         const no = path.parse(fp).name;
         const os = fs.statSync(fp).size;
         
-        // [수정] 설정된 파일명 포맷 적용
+        // 설정된 파일명 포맷 적용
         const outName = getFormattedFileName(settings.fileNameFormat, no, ext, settings.fileNameFormat);
         const parsedOut = path.parse(outName); // 확장자와 이름을 분리
         const xtcPath = getUniqueFilePath(td, parsedOut.name, parsedOut.ext); // 중복 검사 거치기
@@ -342,12 +355,13 @@ ipcMain.on('start-conversion', async (event, settings) => {
                     const line = l.trim().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     return line ? `<p>${line}</p>` : `<p>&nbsp;</p>`;
                 }).join('');
-                createEpub([{ content: htmlBody, name:'c.html' }], ep, no, 'text', settings);
+                createEpub([{ content: htmlBody, title: no }], ep, no, 'text', settings);
             } else if (ext === '.pdf') {
                 const p = await pdfToPng(fp, { disableFontFace: true });
-                createEpub(p.map((x, i)=>({ name:`p${i}.png`, data:x.content })), ep, no, 'image', settings);
-            } else if (ext === '.epub') fs.copyFileSync(fp, ep);
-            else return;
+                createEpub(p.map((x, i)=>({ name:`p${i}.png`, data:x.content, title: no })), ep, no, 'image', settings);
+            } else if (ext === '.epub') {
+                fs.copyFileSync(fp, ep);
+            } else return;
 
             const ok = await runEngine(ep, xtcPath, no);
             const cs = ok && fs.existsSync(xtcPath) ? fs.statSync(xtcPath).size : 0;
@@ -392,14 +406,15 @@ ipcMain.on('start-conversion', async (event, settings) => {
             const no = isFromZip ? path.parse(zipName).name : bn;
             const ext = isFromZip ? 'zip' : 'folder';
 
-            // [수정] 이미지 병합 파일명 포맷 적용
+            // 이미지 병합 파일명 포맷 적용
             const outName = getFormattedFileName(settings.fileNameFormat, no, ext, settings.fileNameFormat);
-            const parsedOut = path.parse(outName); // 확장자와 이름을 분리
-            const xtcPath = getUniqueFilePath(currentTgt, parsedOut.name, parsedOut.ext); // 중복 검사 거치기
+            const parsedOut = path.parse(outName); 
+            const xtcPath = getUniqueFilePath(currentTgt, parsedOut.name, parsedOut.ext); 
             const ep = path.join(tempBaseDir, `g_${Date.now()}.epub`), ts = imgs.reduce((a,b)=>a+b.size, 0);
             
             try {
-                createEpub(imgs.sort((a,b)=>a.name.localeCompare(b.name, undefined, {numeric:true})), ep, no, 'image', settings);
+                const mappedImgs = imgs.sort((a,b)=>a.name.localeCompare(b.name, undefined, {numeric:true})).map(im => ({...im, title: no}));
+                createEpub(mappedImgs, ep, no, 'image', settings);
                 const ok = await runEngine(ep, xtcPath, no);
                 const cs = ok && fs.existsSync(xtcPath) ? fs.statSync(xtcPath).size : 0;
                 if (ok) notifyUI(no, isFromZip ? '.zip' : 'folder', ts, cs, '성공', '이미지 병합 완료');
