@@ -49,7 +49,7 @@
         "to": "epub-to-xtc-converter",
         "filter": [
           "**/*",
-          "node_modules/**/*" 
+          "cli/node_modules/**/*"
         ]
       }
     ],
