@@ -267,7 +267,7 @@ ipcMain.on('start-conversion', async (event, settings) => {
             // 🔥 핵심 변경: exec 대신 spawn을 사용하여 실시간 로그 스트리밍
             await new Promise((resolve, reject) => {
                 const { spawn } = require('child_process');
-                const child = spawn('node', [cliEntry, 'convert', ep, tx, '-c', cp], { cwd: ed });
+                const child = spawn(process.execPath, [cliEntry, 'convert', ep, tx, '-c', cp], { cwd: ed, env: {...process.env, ELECTRON_RUN_AS_NODE: '1'} });
                 
                 let stdoutLog = "", stderrLog = "";
 
