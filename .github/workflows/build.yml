@@ -29,16 +29,23 @@ jobs:
         run: npm install
 
       - name: Install Engine Dependencies
-        # 서버가 직접 엔진의 cli 폴더 안으로 들어가서 부품을 설치합니다.
+        # 엔진의 cli 폴더 안의 의존성을 설치합니다.
         working-directory: ./toXtc_node/epub-to-xtc-converter/cli
         run: npm install
 
+      # 윈도우 빌드 단계
       - name: Build Application (Windows)
         if: matrix.os == 'windows-latest'
         run: npm run build-win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 맥 빌드 전용: dmg-license 설치 (윈도우 설치 에러 방지용)
+      - name: Install Mac Specific Dependencies
+        if: matrix.os == 'macos-latest'
+        run: npm install dmg-license
+
+      # 맥 빌드 단계
       - name: Build Application (Mac)
         if: matrix.os == 'macos-latest'
         run: npm run build-mac
