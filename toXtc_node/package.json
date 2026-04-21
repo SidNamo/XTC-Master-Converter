@@ -1,6 +1,6 @@
 {
   "name": "toxtc_node",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "XTC Master Converter",
   "author": "Namo",
   "repository": {
@@ -25,7 +25,10 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
       "category": "public.app-category.utilities",
       "hardenedRuntime": true,
@@ -58,7 +61,8 @@
     "adm-zip": "^0.5.17",
     "iconv-lite": "^0.7.2",
     "jschardet": "^3.1.4",
-    "pdf-to-png-converter": "^3.18.0"
+    "pdfjs-dist": "^3.11.174",
+    "skia-canvas": "^3.0.8"
   },
   "devDependencies": {
     "electron": "^41.2.1",

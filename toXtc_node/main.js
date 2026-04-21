@@ -1,3 +1,22 @@
+const Module = require('module');
+const originalResolveFilename = Module._resolveFilename;
+
+Module._resolveFilename = function (request, parent, isMain) {
+    if (request === 'canvas') {
+        return originalResolveFilename.call(this, 'skia-canvas', parent, isMain);
+    }
+    return originalResolveFilename.apply(this, arguments);
+};
+
+/**
+ * 2. skia-canvas 패치
+ * PDF.js가 기대하는 'createCanvas' 함수를 skia-canvas 객체에 강제로 심어줍니다.
+ */
+const skia = require('skia-canvas');
+if (!skia.createCanvas) {
+    skia.createCanvas = (width, height) => new skia.Canvas(width, height);
+}
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -7,7 +26,8 @@ const util = require('util');
 const execPromise = util.promisify(exec);
 const iconv = require('iconv-lite');
 const jschardet = require('jschardet');
-const { pdfToPng } = require('pdf-to-png-converter');
+const pdfjs = require('pdfjs-dist/legacy/build/pdf.js'); // legacy 빌드 사용
+const { Canvas } = require('skia-canvas');
 
 app.disableHardwareAcceleration();
 
@@ -232,6 +252,43 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
     zip.writeZip(epubPath);
 }
 
+async function convertPdfToImages(pdfPath) {
+    const data = new Uint8Array(fs.readFileSync(pdfPath));
+    
+    // 워커 비활성화 (Electron 환경 필수)
+    pdfjs.GlobalWorkerOptions.workerSrc = false;
+
+    const loadingTask = pdfjs.getDocument({
+        data,
+        disableFontFace: true,
+        verbosity: 0
+    });
+
+    const pdf = await loadingTask.promise;
+    const images = [];
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        // 고해상도 변환 (2.0 권장)
+        const viewport = page.getViewport({ scale: 2.0 });
+        
+        // skia-canvas 객체 생성
+        const canvas = new Canvas(viewport.width, viewport.height);
+        const context = canvas.getContext('2d');
+
+        // PDF를 skia-canvas에 렌더링
+        await page.render({
+            canvasContext: context,
+            viewport: viewport
+        }).promise;
+
+        // 결과물을 PNG 버퍼로 추출
+        const buffer = await canvas.toBuffer('png');
+        images.push(buffer);
+    }
+    return images;
+}
+
 app.whenReady().then(() => {
     mainWindow = new BrowserWindow({ width: 1100, height: 1100, webPreferences: { nodeIntegration: true, contextIsolation: false } });
     mainWindow.loadFile('index.html');
@@ -357,8 +414,15 @@ ipcMain.on('start-conversion', async (event, settings) => {
                 }).join('');
                 createEpub([{ content: htmlBody, title: no }], ep, no, 'text', settings);
             } else if (ext === '.pdf') {
-                const p = await pdfToPng(fp, { disableFontFace: true });
-                createEpub(p.map((x, i)=>({ name:`p${i}.png`, data:x.content, title: no })), ep, no, 'image', settings);
+                // 수정된 PDF 변환 로직 호출
+                const imageBuffers = await convertPdfToImages(fp);
+                
+                createEpub(imageBuffers.map((buf, i) => ({ 
+                    name: `p${i}.png`, 
+                    data: buf, 
+                    title: no 
+                })), ep, no, 'image', settings);
+
             } else if (ext === '.epub') {
                 fs.copyFileSync(fp, ep);
             } else return;
