@@ -19,7 +19,7 @@ const execPromise = util.promisify(exec);
 const iconv = require('iconv-lite');
 const jschardet = require('jschardet');
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js'); // legacy 빌드 사용
-const { createCanvas } = require('@napi-rs/canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 app.disableHardwareAcceleration();
 
@@ -196,16 +196,18 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
     zip.addFile("META-INF/container.xml", Buffer.from('<?xml version="1.0" encoding="utf-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>', "utf8"));
     
     const css = `
-        body { 
-            text-align: left !important; 
-            word-break: break-all; 
-            line-height: ${settings.lineHeight || 140}%; 
-            margin: 0; 
-            padding: 0;
-        }
+        * { text-align: left !important; word-break: break-all; line-height: ${settings.lineHeight || 140}%; margin: 0; padding: 0; }
         p { margin: 0; padding: 0; text-indent: 0; text-align: left !important; }
+        body, html { height: 100%; width: 100%; overflow: hidden; margin: 0; padding: 0; }
+        .img-container { line-height: 0; text-align: center; width: 100%; } 
     `;
     zip.addFile("OEBPS/style.css", Buffer.from(css, "utf8"));
+
+    const vh = parseInt(settings.h || 800);
+    const vw = parseInt(settings.w || 480);
+    const m = parseInt(settings.margins || 20);
+    const availableH = vh - (2 * m); 
+    const availableW = vw;
 
     let manifest = "", spine = "", navPoints = "";
 
@@ -213,13 +215,38 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
         const ext = path.extname(f.name || '.png').toLowerCase();
         const ih = `i${i}${ext}`;
         const hh = `p${i}.html`;
-        
-        // 파일 제목이 있으면 쓰고 없으면 전체 제목(파일명)을 챕터명으로 사용
         const chapTitle = f.title || title;
 
         if (type === 'image') {
             zip.addFile(`OEBPS/${ih}`, f.data);
-            const imgHtml = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html><head><meta charset="utf-8"/><link rel="stylesheet" type="text/css" href="style.css"/></head><body style="text-align:center;"><img src="${ih}" style="width:100%;"/></body></html>`;
+            
+            const displayIh = (f.oh / f.ow) * availableW;
+            let paddingTop = 0;
+            let imgStyle = "";
+
+            if (displayIh > availableH) {
+                // 세로로 긴 이미지: 높이를 고정하고 좌우 중앙 정렬
+                paddingTop = 0;
+                imgStyle = `height: ${availableH}px; width: auto; display: block; margin: 0 auto;`;
+            } else {
+                // 가로로 꽉 차는 이미지: 너비 100% (자동으로 중앙)
+                paddingTop = (availableH - displayIh) / 2;
+                imgStyle = `width: 100%; height: auto; display: block; margin: 0 auto;`;
+            }
+
+            const imgHtml = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8"/>
+                <link rel="stylesheet" type="text/css" href="style.css"/>
+            </head>
+            <body style="background-color:transparent;">
+                <div class="img-container" style="padding-top: ${paddingTop.toFixed(1)}px;">
+                    <img src="${ih}" style="${imgStyle}"/>
+                </div>
+            </body>
+            </html>`;
+            
             zip.addFile(`OEBPS/${hh}`, Buffer.from(imgHtml, "utf8"));
             manifest += `<item id="img${i}" href="${ih}" media-type="image/${ext==='.png'?'png':'jpeg'}"/><item id="p${i}" href="${hh}" media-type="application/xhtml+xml"/>`;
             spine += `<itemref idref="p${i}"/>`;
@@ -230,12 +257,10 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
             spine += `<itemref idref="p${i}"/>`;
         }
         
-        // 목차 네비게이션 포인트 추가
         navPoints += `<navPoint id="nav${i}" playOrder="${i+1}"><navLabel><text>${chapTitle}</text></navLabel><content src="${hh}"/></navPoint>`;
     });
 
     manifest += `<item id="css" href="style.css" media-type="text/css"/><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`;
-    
     const opf = `<?xml version="1.0" encoding="utf-8"?><package version="2.0" xmlns="http://www.idpf.org/2007/opf"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>${title}</dc:title><dc:language>ko</dc:language></metadata><manifest>${manifest}</manifest><spine toc="ncx">${spine}</spine></package>`;
     const ncx = `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd"><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="uid"/></head><docTitle><text>${title}</text></docTitle><navMap>${navPoints}</navMap></ncx>`;
     
@@ -451,7 +476,16 @@ ipcMain.on('start-conversion', async (event, settings) => {
                 });
                 await scan(zd, path.join(currentTgt, it), true, it);
             } else if (['.png','.jpg','.jpeg','.gif'].includes(ex)) {
-                imgs.push({ path:p, name:it, data:fs.readFileSync(p), size:st.size });
+                const imgBuffer = fs.readFileSync(p);
+                const img = await loadImage(imgBuffer); // 이미지 로드하여 크기 측정
+                imgs.push({ 
+                    path: p, 
+                    name: it, 
+                    data: imgBuffer, 
+                    size: st.size,
+                    ow: img.width,  // 원본 너비
+                    oh: img.height  // 원본 높이
+                });
             } else if (['.txt','.pdf','.epub'].includes(ex)) {
                 await processItem(p, currentTgt);
             }
