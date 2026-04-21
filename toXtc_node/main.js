@@ -3,19 +3,11 @@ const originalResolveFilename = Module._resolveFilename;
 
 Module._resolveFilename = function (request, parent, isMain) {
     if (request === 'canvas') {
-        return originalResolveFilename.call(this, 'skia-canvas', parent, isMain);
+        // 'canvas'를 찾으면 '@napi-rs/canvas'를 반환하도록 리다이렉트
+        return originalResolveFilename.call(this, '@napi-rs/canvas', parent, isMain);
     }
     return originalResolveFilename.apply(this, arguments);
 };
-
-/**
- * 2. skia-canvas 패치
- * PDF.js가 기대하는 'createCanvas' 함수를 skia-canvas 객체에 강제로 심어줍니다.
- */
-const skia = require('skia-canvas');
-if (!skia.createCanvas) {
-    skia.createCanvas = (width, height) => new skia.Canvas(width, height);
-}
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
@@ -27,7 +19,7 @@ const execPromise = util.promisify(exec);
 const iconv = require('iconv-lite');
 const jschardet = require('jschardet');
 const pdfjs = require('pdfjs-dist/legacy/build/pdf.js'); // legacy 빌드 사용
-const { Canvas } = require('skia-canvas');
+const { createCanvas } = require('@napi-rs/canvas');
 
 app.disableHardwareAcceleration();
 
@@ -254,8 +246,6 @@ function createEpub(files, epubPath, title, type = 'text', settings = {}) {
 
 async function convertPdfToImages(pdfPath) {
     const data = new Uint8Array(fs.readFileSync(pdfPath));
-    
-    // 워커 비활성화 (Electron 환경 필수)
     pdfjs.GlobalWorkerOptions.workerSrc = false;
 
     const loadingTask = pdfjs.getDocument({
@@ -269,21 +259,23 @@ async function convertPdfToImages(pdfPath) {
 
     for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        // 고해상도 변환 (2.0 권장)
         const viewport = page.getViewport({ scale: 2.0 });
-        
-        // skia-canvas 객체 생성
-        const canvas = new Canvas(viewport.width, viewport.height);
+
+        /** * @napi-rs/canvas 방식
+         * 이제 createCanvas가 존재하므로 PDF.js 내부 로직과 완벽히 호환됩니다.
+         */
+        const canvas = createCanvas(viewport.width, viewport.height);
         const context = canvas.getContext('2d');
 
-        // PDF를 skia-canvas에 렌더링
         await page.render({
             canvasContext: context,
             viewport: viewport
         }).promise;
 
-        // 결과물을 PNG 버퍼로 추출
-        const buffer = await canvas.toBuffer('png');
+        // 버퍼 추출 (toBuffer는 프로미스를 반환할 수도 있으니 확인 필요)
+        // @napi-rs/canvas의 toBuffer는 기본적으로 동기 방식이지만, 
+        // 하위 호환성을 위해 아래와 같이 사용합니다.
+        const buffer = canvas.toBuffer('image/png');
         images.push(buffer);
     }
     return images;
